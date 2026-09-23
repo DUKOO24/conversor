@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Conversor de Sistemas Numéricos</title>
+<style>
+  :root {
+    --bg: #f4f4f4;
+    --card: #ffffff;
+    --text: #222222;
+    --muted: #666666;
+    --border: #dddddd;
+    --accent: #4a4a4a;
+    --accent-text: #ffffff;
+    --error: #b03030;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1e1e1e;
+      --card: #2a2a2a;
+      --text: #eeeeee;
+      --muted: #aaaaaa;
+      --border: #444444;
+      --accent: #888888;
+      --accent-text: #111111;
+      --error: #e07a7a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1e1e1e;
+    --card: #2a2a2a;
+    --text: #eeeeee;
+    --muted: #aaaaaa;
+    --border: #444444;
+    --accent: #888888;
+    --accent-text: #111111;
+    --error: #e07a7a;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  body {
+    margin: 0;
+    min-height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    padding: 20px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+    padding-top: calc(20px + env(safe-area-inset-top, 0px));
+    display: flex;
+    justify-content: center;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    width: 100%;
+    max-width: 420px;
+  }
+  h1 {
+    font-size: 1.15rem;
+    margin: 0 0 4px 0;
+    text-align: center;
+  }
+  p.sub {
+    margin: 0 0 18px 0;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+  label {
+    display: block;
+    font-size: 0.85rem;
+    margin-bottom: 6px;
+    color: var(--muted);
+  }
+  select, input[type="text"] {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 1rem;
+    margin-bottom: 14px;
+  }
+  button {
+    width: 100%;
+    padding: 11px;
+    border: none;
+    border-radius: 6px;
+    background: var(--accent);
+    color: var(--accent-text);
+    font-size: 1rem;
+    cursor: pointer;
+    margin-bottom: 16px;
+  }
+  button:active { opacity: 0.85; }
+  button.secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+    margin-top: -6px;
+  }
+  .error {
+    color: var(--error);
+    font-size: 0.85rem;
+    margin: -8px 0 14px 0;
+    min-height: 1em;
+  }
+  .results {
+    display: grid;
+    gap: 10px;
+  }
+  .result-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+  }
+  .result-row.active {
+    border-color: var(--accent);
+  }
+  .result-label {
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  .result-value {
+    font-family: "Courier New", monospace;
+    font-size: 0.95rem;
+    word-break: break-all;
+    text-align: right;
+    margin-left: 10px;
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Conversor de Sistemas Numéricos</h1>
+    <p class="sub">Binario · Decimal · Octal · Hexadecimal</p>
+
+    <label for="base">Sistema del número que vas a ingresar</label>
+    <select id="base">
+      <option value="2">Binario (base 2)</option>
+      <option value="10" selected>Decimal (base 10)</option>
+      <option value="8">Octal (base 8)</option>
+      <option value="16">Hexadecimal (base 16)</option>
+    </select>
+
+    <label for="num">Número</label>
+    <input type="text" id="num" placeholder="Ej: 91.625" autocomplete="off">
+
+    <button id="convertBtn">Convertir</button>
+    <button id="clearBtn" class="secondary">Limpiar</button>
+    <div class="error" id="error"></div>
+
+    <div class="results">
+      <div class="result-row" data-base="2"><span class="result-label">Binario</span><span class="result-value" id="out-2">—</span></div>
+      <div class="result-row" data-base="10"><span class="result-label">Decimal</span><span class="result-value" id="out-10">—</span></div>
+      <div class="result-row" data-base="8"><span class="result-label">Octal</span><span class="result-value" id="out-8">—</span></div>
+      <div class="result-row" data-base="16"><span class="result-label">Hexadecimal</span><span class="result-value" id="out-16">—</span></div>
+    </div>
+  </div>
+
+<script>
+  const DIGITS = "0123456789ABCDEF";
+
+  function parseToDecimal(str, base) {
+    str = str.trim().toUpperCase();
+    if (str === "") throw new Error("Escribe un número.");
+    const parts = str.split(".");
+    if (parts.length > 2) throw new Error("Formato inválido.");
+    const [intPart, fracPart = ""] = parts;
+    if (intPart === "" && fracPart === "") throw new Error("Formato inválido.");
+
+    let intVal = 0;
+    for (const ch of intPart) {
+      const d = DIGITS.indexOf(ch);
+      if (d < 0 || d >= base) throw new Error(`"${ch}" no es válido en esta base.`);
+      intVal = intVal * base + d;
+    }
+
+    let fracVal = 0;
+    let factor = 1 / base;
+    for (const ch of fracPart) {
+      const d = DIGITS.indexOf(ch);
+      if (d < 0 || d >= base) throw new Error(`"${ch}" no es válido en esta base.`);
+      fracVal += d * factor;
+      factor /= base;
+    }
+
+    return intVal + fracVal;
+  }
+
+  function intToBase(n, base) {
+    if (n === 0) return "0";
+    let res = "";
+    while (n > 0) {
+      res = DIGITS[n % base] + res;
+      n = Math.floor(n / base);
+    }
+    return res;
+  }
+
+  function fracToBase(frac, base, precision) {
+    let res = "";
+    for (let i = 0; i < precision && frac > 0; i++) {
+      frac *= base;
+      const d = Math.floor(frac);
+      res += DIGITS[d];
+      frac -= d;
+    }
+    return res;
+  }
+
+  function decimalToBase(value, base, precision = 8) {
+    const intPart = Math.floor(value);
+    const fracPart = value - intPart;
+    const intStr = intToBase(intPart, base);
+    const fracStr = fracPart > 0 ? fracToBase(fracPart, base, precision) : "";
+    return fracStr ? intStr + "." + fracStr : intStr;
+  }
+
+  function convert() {
+    const base = parseInt(document.getElementById("base").value, 10);
+    const numStr = document.getElementById("num").value;
+    const errorEl = document.getElementById("error");
+    errorEl.textContent = "";
+
+    document.querySelectorAll(".result-row").forEach(row => {
+      row.classList.toggle("active", parseInt(row.dataset.base, 10) === base);
+    });
+
+    let decValue;
+    try {
+      decValue = parseToDecimal(numStr, base);
+    } catch (e) {
+      errorEl.textContent = e.message;
+      [2, 8, 10, 16].forEach(b => document.getElementById("out-" + b).textContent = "—");
+      return;
+    }
+
+    [2, 8, 10, 16].forEach(b => {
+      document.getElementById("out-" + b).textContent = decimalToBase(decValue, b);
+    });
+  }
+
+  document.getElementById("convertBtn").addEventListener("click", convert);
+  document.getElementById("num").addEventListener("keydown", e => {
+    if (e.key === "Enter") convert();
+  });
+
+  document.getElementById("clearBtn").addEventListener("click", () => {
+    document.getElementById("num").value = "";
+    document.getElementById("error").textContent = "";
+    document.querySelectorAll(".result-row").forEach(row => row.classList.remove("active"));
+    [2, 8, 10, 16].forEach(b => document.getElementById("out-" + b).textContent = "—");
+    document.getElementById("num").focus();
+  });
+</script>
+</body>
+</html>
